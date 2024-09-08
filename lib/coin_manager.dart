@@ -2,16 +2,32 @@ import 'dart:ffi';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 const coinValues = [1, 5, 10, 50, 100, 500, 1000];
 
 class CoinState extends ChangeNotifier {
-  var coinCnt = [4, 1, 4, 1, 4, 1];
-  var costCoins = [0, 0, 0, 0, 0, 0, 0];
+  CoinState() {
+    initState();
+  }
+
+  var coinCnt;
+  var costCoins;
+  var costCoinSum;
+  var otrSum;
+  var inValue;
+
+  initState() {
+    coinCnt = [4, 1, 4, 1, 4, 1];
+    costCoins = [0, 0, 0, 0, 0, 0, 0];
+    costCoinSum = 0;
+    otrSum = 0;
+    inValue = 0;
+  }
 
   addCoin(index) {
-    coinCnt[index] = min((coinCnt[index] as int) + 1, 99);
+    coinCnt[index] = min((coinCnt[index] as int) + 1, 20);
     notifyListeners();
   }
 
@@ -29,16 +45,18 @@ class CoinState extends ChangeNotifier {
   }
 
   outCostCoins(value) {
+    inValue = value;
     CalcCoin calcCoin = CalcCoin(value: value, coins: coinCnt);
     calcCoin.calc();
     coinCnt = calcCoin.coins;
     costCoins = calcCoin.out;
+    costCoinSum = calcCoin.sum;
+    otrSum = calcCoin.otrSum;
     notifyListeners();
   }
 
   initCoinCnt() {
-    coinCnt = [4, 1, 4, 1, 4, 1];
-    costCoins = [0, 0, 0, 0, 0, 0, 0];
+    initState();
     notifyListeners();
   }
 }
@@ -52,21 +70,27 @@ class CalcCoin {
   final int value;
   final coins;
   var otr = [0, 0, 0, 0, 0, 0];
-  var out = [0, 0, 0, 0, 0, 0];
+  var out = [0, 0, 0, 0, 0, 0, 0];
   var minCnt = 10000;
   int c1000 = 0;
+  int sum = 0;
+  int otrSum = 0;
 
   calc() {
     c1000 = (value / 1000).toInt();
-    int sum = 0;
+    sum = 0;
     for (var i = 0; i < 6; i++) {
       sum += coins[i] * coinValues[i] as int;
     }
     if (sum + c1000 * 1000 < value) c1000++;
     dfs(5, coins, 0);
+    sum = 0;
+    otrSum = 0;
     for (var i = 0; i < 6; i++) {
-      sum += coins[i] * coinValues[i] as int;
+      sum += out[i] * coinValues[i];
+      otrSum += otr[i] * coinValues[i];
     }
+    out.add(c1000);
     sum += c1000 * 1000;
 
     for (var i = 0; i < 6; i++) {
@@ -75,9 +99,9 @@ class CalcCoin {
     }
   }
 
-  dfs(int coinIndex, coss, sum) {
+  dfs(int coinIndex, coss, sumBf) {
     if (coinIndex < 0) {
-      int dif = sum + c1000 * 1000 - value;
+      int dif = sumBf + c1000 * 1000 - value;
       if (dif < 0) return;
       int cnt = 0;
       var otrbf = [0, 0, 0, 0, 0, 0];
@@ -97,7 +121,7 @@ class CalcCoin {
     var coinBf = List<int>.from(coss);
     for (var i = 0; i <= coss[coinIndex]; i++) {
       coinBf[coinIndex] = i;
-      dfs(coinIndex - 1, coinBf, sum + coinValues[coinIndex] * i);
+      dfs(coinIndex - 1, coinBf, sumBf + coinValues[coinIndex] * i);
     }
   }
 }
@@ -110,8 +134,25 @@ class CoinManipulatorContent extends StatefulWidget {
 class _CoinManipulatorContentState extends State<CoinManipulatorContent> {
   @override
   Widget build(BuildContext context) {
+    var cState = context.watch<CoinState>();
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Opacity(
+              opacity: 0.5,
+              child: Text(
+                  style: TextStyle(fontSize: 20),
+                  '所持枚数: ${cState.coinsCnt()}枚')),
+        ),
+        Divider(
+          thickness: 2,
+        ),
+        SizedBox(
+          height: 8,
+        ),
         Row(
           children: [
             for (var i = 0; i < 4; i++)
@@ -131,9 +172,6 @@ class _CoinManipulatorContentState extends State<CoinManipulatorContent> {
               )),
           ],
         ),
-        IconButton(
-          onPressed: ()=>{ Provider.of<CoinState>(context, listen: false).initCoinCnt()}, 
-          icon: Icon(Icons.restart_alt)),
       ],
     );
   }
@@ -181,21 +219,60 @@ class CoinDisplayContent extends StatelessWidget {
   Widget build(BuildContext context) {
     var cState = context.watch<CoinState>();
 
-    return Card(
-      color: Theme.of(context).colorScheme.inversePrimary,
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
       child: Column(
         children: [
-          Row(
-            children: [
-              for (int i = 0; i < 4; i++)
-                CostCoinUI(value: coinValues[i], cnt: cState.costCoins[i]),
-            ],
-          ),
-          Row(
-            children: [
-              for (int i = 4; i < 6; i++)
-                CostCoinUI(value: coinValues[i], cnt: cState.costCoins[i]),
-            ],
+          Card(
+            color: Theme.of(context).colorScheme.inversePrimary,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '支払金額: ${cState.costCoinSum}円',
+                        style: TextStyle(fontSize: 20),
+                      ),
+                      Expanded(
+                        child: Opacity(
+                          opacity: 0.5,
+                          child: Text(
+                            textAlign: TextAlign.right,
+                            'お釣り: ${cState.otrSum}円',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                  Divider(
+                    thickness: 1,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  Row(
+                    children: [
+                      for (int i = 0; i < 4; i++)
+                        Expanded(
+                            child: CostCoinUI(
+                                value: coinValues[i],
+                                cnt: cState.costCoins[i])),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      for (int i = 4; i <= 6; i++)
+                        Expanded(
+                            flex: i == 6 ? 2 : 1,
+                            child: CostCoinUI(
+                                value: coinValues[i],
+                                cnt: cState.costCoins[i])),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -215,31 +292,44 @@ class CostCoinUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        CircleAvatar(
-          backgroundColor: cnt == 0
-              ? Colors.transparent
-              : Theme.of(context).colorScheme.primaryContainer,
-          child: Text(
-            value.toString(),
+    var _bgColor = Theme.of(context).colorScheme.primaryContainer;
+    var _txtColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    return Opacity(
+      opacity: cnt == 0 ? 0.1 : 1,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          value == 1000
+              ? Card(
+                  color: _bgColor,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      '${value}',
+                      style: TextStyle(
+                        color: _txtColor,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                )
+              : CircleAvatar(
+                  backgroundColor: _bgColor,
+                  child: Text(
+                    value.toString(),
+                    style: TextStyle(
+                      color: _txtColor,
+                    ),
+                  ),
+                ),
+          Text(
+            cnt.toString(),
             style: TextStyle(
-              color: cnt == 0
-                  ? Colors.transparent
-                  : Theme.of(context).colorScheme.onPrimaryContainer,
+              color: _txtColor,
             ),
           ),
-        ),
-        Text(
-          cnt.toString(),
-          style: TextStyle(
-            color: cnt == 0
-                ? Colors.transparent
-                : Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -250,26 +340,56 @@ class InputContent extends StatelessWidget {
     final cState = context.watch<CoinState>();
     var _controller = TextEditingController();
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: TextField(
-            maxLength: 4,
-            maxLines: 1,
-            controller: _controller,
-            decoration: InputDecoration(
-                icon: Icon(Icons.currency_yen),
-                hintText: "問題の金額",
-                labelText: "金額",
-                suffixIcon: IconButton(
-                    onPressed: () => {},
-                    icon: Icon(Icons.clear))),
-            onSubmitted: (value) => {cState.outCostCoins(int.parse(value))},
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TextButton.icon(
+            onPressed: () =>
+                {Provider.of<CoinState>(context, listen: false).initCoinCnt()},
+            label: Text('リセット'),
+            icon: Icon(Icons.restart_alt),
           ),
-        ),
-        Text(style: TextStyle(fontSize: 26), '${cState.coinsCnt()}枚')
-      ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  maxLength: 4,
+                  maxLines: 1,
+                  controller: _controller,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.digitsOnly
+                  ],
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                      icon: Icon(Icons.currency_yen),
+                      hintText: "問題の金額",
+                      labelText: "金額",
+                      suffixIcon: IconButton(
+                          onPressed: () => {}, icon: Icon(Icons.clear))),
+                  onSubmitted: (value) =>
+                      {cState.outCostCoins(int.parse(value))},
+                ),
+              ),
+              Expanded(
+                  flex: 1,
+                  child: Card(
+                    color: Theme.of(context).colorScheme.primary,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        '${cState.inValue}円',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 20, color: Theme.of(context).colorScheme.onPrimary),
+                      ),
+                    ),
+                  ))
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
