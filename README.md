@@ -1,6 +1,6 @@
-# how_much
+# お支払い技術検定ソルバー
 
-A new Flutter project.
+お支払い術検定を解くためのアプリです。
 
 ## Getting Started
 
