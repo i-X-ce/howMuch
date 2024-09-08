@@ -5,6 +5,7 @@ import 'package:namer_app/coin_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+
 const String appTitle = 'お支払い技術検定ソルバー';
 
 void main() {
@@ -35,20 +36,41 @@ class myHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(appTitle, style: TextStyle(color: Theme.of(context).colorScheme.onInverseSurface),),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Center(
-        child: ListView(
-          children: [
-            InputContent(),
-            CoinDisplayContent(),
-            CoinManipulatorContent(),
-          ],
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(appTitle, style: TextStyle(color: Theme.of(context).colorScheme.onInverseSurface),),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+          body: Center(
+            child: constraints.maxWidth < 700 
+            ? Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                InputContent(),
+                CoinDisplayContent(),
+                CoinManipulatorContent(),
+              ],
+            )
+            : Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: InputContent()),
+                    Expanded(child: CoinManipulatorContent()),
+                  ],
+                ),
+                CoinDisplayContent(),
+              ],
+            ),
+          ),
+        );
+      }
     );
   }
 }

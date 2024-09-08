@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="how_much"
+        android:label="支払い技術検定ソルバー"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
